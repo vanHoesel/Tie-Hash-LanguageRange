@@ -38,9 +38,9 @@ sub STORE {
     my $language_tag    = shift;
     my $value           = shift;
     
-    if (not defined $lang) {
+    if (not defined $language_tag) {
         carp "Using 'undef' as key is not usual...";
-        $lang = $self->{defaults}->[0];
+        $language_tag = $self->{defaults}->[0];
     }
     $self->{variants}{$language_tag} = $value;
 }
@@ -51,22 +51,23 @@ sub FETCH {
     goto LANGUAGES_DEFAULTS if not defined $language_range;
     # we have some language in argument
     my $language_range  = _languageRange_normalize ( $language_range );
-    my @language_tags   = _languageRange_parse( $language_range );
+    my @language_weight = _languageRange_parse( $language_range );
+use DDP; p @language_weight;
 LANGUAGES_ARGUMENT:
     # let's see if we can find one
-    foreach (@language_tags) {
-        exit FETCH if not defined $_->{languages}; # don't do alternatives
-        return $self->{variants}->{$_->{languages}}
-            if exists $self->{variants}->{$_->{languages}};
+    foreach (@language_weight) {
+        exit FETCH if not defined $_->{language_tag}; # don't do alternatives
+        return $self->{variants}->{$_->{language_tag}}
+            if exists $self->{variants}->{$_->{language_tag}};
     }
 LANGUAGES_DEFAULTS:
     # so, we have not find one in the arguments list, bummer
     # but since there was no 'undef' in the list,
     # it seems okay for a default
     foreach (@{$self->{defaults}}) {
-        exit FETCH if not defined $_->{languages}; # don't do alternatives
-        return $self->{variants}->{$_->{languages}}
-            if exists $self->{variants}->{$_->{languages}};
+        exit FETCH if not defined $_->{language_tag}; # don't do alternatives
+        return $self->{variants}->{$_->{language_tag}}
+            if exists $self->{variants}->{$_->{language-tag}};
     }
     # still haven't found a match
     # but since there was no 'undef' in the list,
@@ -104,12 +105,12 @@ sub _languageRange_parse {
     my @sorted;
     foreach (@equals) {
         if ( /\s*([a-zA-Z-]+);\s*q\s*=\s*(\d*\.?\d*)/ ) {
-            push @sorted, { languages => $1, quality => $2 };
+            push @sorted, { language_tag => $1, quality => $2 };
         } else {
-            push @sorted, { languages => $_, quality => 1  };
+            push @sorted, { language_tag => $_, quality => 1  };
         }
     }
-    @sorted = reverse sort { $a->{quality} <=> $b->{quality} } @sorted;
+    @sorted = sort { $b->{quality} <=> $a->{quality} } @sorted;
     return @sorted;
 }
 
