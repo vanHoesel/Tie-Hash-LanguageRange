@@ -4,7 +4,6 @@ require Tie::Hash;
 @ISA = 'Tie::Hash';
 
 use Carp;
-$DEBUG = 0;
 
 # use HTTP::Headers::Util;
 
@@ -12,12 +11,12 @@ our @DEFAULTS;          # application wide defaults, global setting
 our %PRIORITY_LISTS;    # cache for parsed Language Tag strings
 
 sub import {
-    my $class 	= shift;
+    my $class           = shift;
     if (@_ > 1) {
         @DEFAULTS = @_;
     } else {
-        my $language_range = _languageTag_normalize ( shift );
-        @DEFAULTS = _languageTag_parse ( $language_range );
+        my $language_range = _languageRange_normalize ( shift );
+        @DEFAULTS = _languageRange_parse ( $language_range );
     };
 }
 
@@ -46,13 +45,13 @@ sub STORE {
 }
 
 sub FETCH {
+carp "ARRAY WANTED\n" if wantarray;
     my $self            = shift;
     my $language_range  = shift;
     goto LANGUAGES_DEFAULTS if not defined $language_range;
-    # we have some language in argument
+    # we have a language range (hopefully)
     my $language_range  = _languageRange_normalize ( $language_range );
     my @language_weight = _languageRange_parse( $language_range );
-use DDP; p @language_weight;
 LANGUAGES_ARGUMENT:
     # let's see if we can find one
     foreach (@language_weight) {
@@ -100,8 +99,8 @@ sub _languageRange_normalize {
 }
 
 sub _languageRange_parse {
-    my $string 	        = shift;
-    my @equals          = split ', ', $string;
+    my $language_range  = shift;
+    my @equals          = split ', ', $language_range;
     my @sorted;
     foreach (@equals) {
         if ( /\s*([a-zA-Z-]+);\s*q\s*=\s*(\d*\.?\d*)/ ) {
