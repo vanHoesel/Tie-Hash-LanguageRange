@@ -1,4 +1,4 @@
-package Hash::LanguageTag;
+package Tie::Hash::LanguageRange;
 
 require Tie::Hash;
 @ISA = 'Tie::Hash';
@@ -16,8 +16,8 @@ sub import {
     if (@_ > 1) {
         @DEFAULTS = @_;
     } else {
-        my $language_tag = _languageTag_normalize ( shift );
-        @DEFAULTS = _languageTag_parse ( $language_tag );
+        my $language_range = _languageTag_normalize ( shift );
+        @DEFAULTS = _languageTag_parse ( $language_range );
     };
 }
 
@@ -35,46 +35,43 @@ sub TIEHASH {
 
 sub STORE {
     my $self            = shift;
-    my $lang            = shift;
+    my $language_tag    = shift;
     my $value           = shift;
     
     if (not defined $lang) {
         carp "Using 'undef' as key is not usual...";
         $lang = $self->{defaults}->[0];
     }
-    $self->{variants}{$lang} = $value;
+    $self->{variants}{$language_tag} = $value;
 }
 
 sub FETCH {
     my $self            = shift;
-    my $lang            = shift;
-    goto LANGUAGES_DEFAULTS if not defined $lang;
+    my $language_range  = shift;
+    goto LANGUAGES_DEFAULTS if not defined $language_range;
     # we have some language in argument
-    my $language_tag    = _languageTag_normalize ( $lang );
-    my @languages       = _languageTag_parse( $language_tag );
+    my $language_range  = _languageRange_normalize ( $language_range );
+    my @language_tags   = _languageRange_parse( $language_range );
 LANGUAGES_ARGUMENT:
-carp "LANGUAGES_ARGUMENT:\n";
     # let's see if we can find one
-    foreach (@languages) {
-use DDP; p $_;
+    foreach (@language_tags) {
         exit FETCH if not defined $_->{languages}; # don't do alternatives
-        return $self->{variants}->{$_->{languages}} if exists $self->{variants}->{$_->{languages}};
+        return $self->{variants}->{$_->{languages}}
+            if exists $self->{variants}->{$_->{languages}};
     }
 LANGUAGES_DEFAULTS:
-carp "LANGUAGES_DEFAULTS:\n";
     # so, we have not find one in the arguments list, bummer
     # but since there was no 'undef' in the list,
     # it seems okay for a default
     foreach (@{$self->{defaults}}) {
-use DDP; p $_;
         exit FETCH if not defined $_->{languages}; # don't do alternatives
-        return $self->{variants}->{$_->{languages}} if exists $self->{variants}->{$_->{languages}};
+        return $self->{variants}->{$_->{languages}}
+            if exists $self->{variants}->{$_->{languages}};
     }
     # still haven't found a match
     # but since there was no 'undef' in the list,
     # it seems okay to return anything we have
 LANGUAGES_ANYTHING:
-carp "LANGUAGES_ANYTHING:\n";
     return $self->{variants}{$language_arg}
     
 }
@@ -95,12 +92,13 @@ sub DELETE {
     my $language;
 }
 
-sub _languageTag_normalize {
-    my $language_tag    = shift;
-    chomp($language_tag);
-    return join ', ', map { s/^\s+|\s+$//g; $_ } split ',', $language_tag;
+sub _languageRange_normalize {
+    my $language_range  = shift;
+    chomp($language_range);
+    return join ', ', map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
 }
-sub _languageTag_parse {
+
+sub _languageRange_parse {
     my $string 	        = shift;
     my @equals          = split ', ', $string;
     my @sorted;
@@ -112,7 +110,6 @@ sub _languageTag_parse {
         }
     }
     @sorted = reverse sort { $a->{quality} <=> $b->{quality} } @sorted;
-use DDP; p @sorted;
     return @sorted;
 }
 

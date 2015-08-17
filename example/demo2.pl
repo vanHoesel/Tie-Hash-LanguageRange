@@ -4,10 +4,10 @@ use strict;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-use Hash::LanguageTag;
+use Tie::Hash::LanguageRange;
 
 my %greetings;
-tie %greetings, 'Hash::LanguageTag', qw/fr nl/;
+tie %greetings, 'Tie::Hash::LanguageRange', qw/fr nl/;
 
 $greetings{nl} = "Hallo Wereld";
 $greetings{hu} = "Helló Világ";

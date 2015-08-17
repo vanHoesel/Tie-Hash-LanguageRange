@@ -6,11 +6,11 @@ use lib "$FindBin::Bin/../lib";
 
 use DDP;
 
-use Hash::LanguageTag 'en-GB, nl, en, it, en-US';
+use Tie::Hash::LanguageRange 'en-GB, nl, en, it, en-US';
 
 my %Hello_World;
 
-tie %Hello_World, 'Hash::LanguageTag', qw/fr nl/;
+tie %Hello_World, 'Tie::Hash::LanguageRange', qw/fr nl/;
 
 my $lang = undef;
 

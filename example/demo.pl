@@ -4,7 +4,7 @@ use strict;
 use FindBin;
 use lib "$FindBin::Bin/../lib";
 
-use Hash::LanguageTag;
+use Tie::Hash::LanguageRange;
 
 my %greetings;
 
