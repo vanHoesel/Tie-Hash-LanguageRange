@@ -48,6 +48,31 @@ sub FETCH {
 carp "ARRAY WANTED\n" if wantarray;
     my $self            = shift;
     my $language_range  = shift;
+    my $language_tag    = $self->EXISTS($language_range);
+    return $self->{variants}{$language_tag} if $language_tag;
+    # still haven't found a match
+    # but since there was no 'undef' in the list,
+    # it seems okay to return anything we have
+LANGUAGES_ANYTHING:
+    return $self->{variants}{$language_arg}
+    
+}
+
+=head2 EXISTS
+
+Returns an exisitng Language-Tag for hte one that matches the Language-Range
+best. If none found in the exisiting keys, it returns C<FALSE>.
+
+Since C<FALSE> is defined as en empty string, the numeric value 0 or undef and
+C<TRUE> as anything else, it is not needed to return 1 for a positive outcome.
+Therofore we return the matched C<Language Tag>. This can be useful if one
+wants to know what language actually has been used in a lookup with C<FETCH>.
+
+=cut
+
+sub EXISTS {
+    my $self            = shift;
+    my $language_range  = shift;
     goto LANGUAGES_DEFAULTS if not defined $language_range;
     # we have a language range (hopefully)
     my $language_range  = _languageRange_normalize ( $language_range );
@@ -55,8 +80,9 @@ carp "ARRAY WANTED\n" if wantarray;
 LANGUAGES_ARGUMENT:
     # let's see if we can find one
     foreach (@language_weight) {
-        exit FETCH if not defined $_->{language_tag}; # don't do alternatives
-        return $self->{variants}->{$_->{language_tag}}
+        exit EXISTS if not defined $_->{language_tag}; # don't do alternatives
+        # this matching schema needs to be changed a lot
+        return $_->{language_tag}
             if exists $self->{variants}->{$_->{language_tag}};
     }
 LANGUAGES_DEFAULTS:
@@ -64,16 +90,12 @@ LANGUAGES_DEFAULTS:
     # but since there was no 'undef' in the list,
     # it seems okay for a default
     foreach (@{$self->{defaults}}) {
-        exit FETCH if not defined $_->{language_tag}; # don't do alternatives
-        return $self->{variants}->{$_->{language_tag}}
+        exit EXISTS if not defined $_->{language_tag}; # don't do alternatives
+        return $_->{language_tag}
             if exists $self->{variants}->{$_->{language-tag}};
     }
-    # still haven't found a match
-    # but since there was no 'undef' in the list,
-    # it seems okay to return anything we have
-LANGUAGES_ANYTHING:
-    return $self->{variants}{$language_arg}
     
+    return;
 }
 
 sub FIRSTKEY {
