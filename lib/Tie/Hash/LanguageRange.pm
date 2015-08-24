@@ -59,11 +59,9 @@ sub STORE {
 }
 
 sub FETCH {
-carp "ARRAY WANTED\n" if wantarray;
     my $self                    = shift;
     my $language_range          = shift;
     my $language_tag            = $self->EXISTS($language_range);
-carp "Found Language: $language_tag\n";
     return $self->{variants}{$language_tag} if $language_tag;
     # still haven't found a match
     # but since there was no 'undef' in the list,
@@ -151,7 +149,7 @@ sub _parse_language_range {
     my @parts  = map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
     my @priorities;
     foreach (@parts) {
-        if ( /\s*([a-zA-Z-]+);\s*q\s*=\s*(\d*\.?\d*)/ ) {
+        if ( /\s*([-_a-zA-Z]+)\s*;\s*q\s*=\s*(\d*\.?\d*)/ ) {
             push @priorities, {
                 language_tag    => _normalize_language_tag($1),
                 quality         => $2,
