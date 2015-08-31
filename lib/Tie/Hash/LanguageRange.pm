@@ -6,74 +6,68 @@ require Tie::Hash;
 use Carp;
 use DDP;
 
-# use HTTP::Headers::Util;
+=head1 NAME
 
-our @DEFAULTS;          # application wide defaults, global setting
-our %PRIORITY_LISTS;    # cache for parsed Language Tag strings
+Tie::Hash::LanguageRange - use RFC Language Ranges for hash keys
 
-sub import {
-    my $class                   = shift;
-    if (@_ > 1) {
-        carp "More arguments than expected ... assuming list of Language-Tags";
-        my $language_range = join ', ', @_;
-        @DEFAULTS = _parse_language_range ( $language_range );
-    } else {
-        my $language_range = shift;
-        @DEFAULTS = _parse_language_range ( $language_range );
-    };
-}
+=head1 SYNOPSIS
 
-sub TIEHASH {
-    my $class                   = shift;
-    my @defaults;
-    if (@_ > 1) {
-        carp "More arguments than expected ... assuming list of Language-Tags";
-        my $language_range  = join ', ', @_ ;
-        @defaults           = _parse_language_range ( $language_range );
-    } elsif (@_ == 1) {
-        my $language_range  = shift;
-        @defaults           = _parse_language_range ( $language_range );
-    } else {
-        @defaults           = @DEFAULTS;
-    };
+    use Tie::Hash::LanguageRange;
     
-    my $hash = {
-        variants    => {},
-        defaults    => \@defaults,
-    };
+    my %greetings;
+    tie %greetings, 'Tie::Hash::LanguageRange';
     
-    return bless $hash, $class
-}
+    $greetings{'en'}            = "Hello World";
+    $greetings{'en-GB'}         = "Hello London";
+    $greetings{'nl'}            = "Hallo Wereld";
+    
+    print $greetings{'en-US'};  # "Hello World"
+    print $greetings{'en-GB'};  # "Hello London"
+    
+    print $greetings{'en; q=0.8, nl'};
+                                # "Hallo Wereld";
 
-sub STORE {
-    my $self                    = shift;
-    my $language_tag            = shift;
-    my $value                   = shift;
     
-    if (not defined $language_tag) {
-        carp "Using 'undef' as key is not usual...";
-        $language_tag = $self->{defaults}->[0]->{language_tag};
-    }
-    my $language_key = _normalize_language_tag($language_tag);
-    $self->{variants}{$language_key} = $value;
-}
+=head1 DESCRIPTION
 
-sub FETCH {
-    my $self                    = shift;
-    my $language_range          = shift;
-    my $language_tag            = $self->EXISTS($language_range);
-    return $self->{variants}{$language_tag} if $language_tag;
-    # still haven't found a match
-    # but since there was no 'undef' in the list,
-    # it seems okay to return anything we have
-LANGUAGES_ANYTHING:
-    return $self->{variants}{$language_arg}
-    
-}
+This module allows the usage of a Language-Range to lookup a value in a hash.
+
+Language Tags and Language Ranges are a beast, whole RFCs have been written to
+define a Language-Tag and how to filter and lookup based on a Language-Range.
+
+The HTTP request header: Accept-Language is a very common usage of the
+Language-Range to send a language preference order to the server. Instead of
+analyzing the header value and checking what languages are accepted in what
+order, just pass in the string as the key for a hash.
+
+ 
+
+=head1 METHODS
+
+Since the interface of a tied-hash is no different than a normal hash, there is
+nothing worth mentioning about the methods that are implemented. Just use it as
+a normal hash.
+
+But... there are some imported things to know:
+
+=head2 STORE
+
+Keys are normalized to common practice for capitalization, so that 'DE-CH' and
+'de-ch', both are stored under the same key: 'de-CH' (German as used in
+Switzerland). And Ukraine either as 'uk-Latn' or 'uk-Cyrl'.
+
+The hash-keys are also checked on well-formatting, according to RFC ....,
+non-conforming keys are rejected.
+
+It will not work trying to use a Language-Tag like 'no-Language' (Although...
+that would be 'Norwegian' in the 'Language' variant and still pass the check
+- see the RFCs).
+
+=head2 FETCH
 
 =head2 EXISTS
 
-Returns an exisitng Language-Tag for hte one that matches the Language-Range
+Returns an exisitng Language-Tag for the one that matches the Language-Range
 best. If none found in the exisiting keys, it returns C<FALSE>.
 
 Since C<FALSE> is defined as en empty string, the numeric value 0 or undef and
@@ -93,33 +87,122 @@ C<FALSE>
 
 =back
 
+So... it returns either true ( '1' ) or false ( "" , the empty string).
+
+See the L<matched_key> method to find out how it has been matched for EXISTS.
+
+=head2 KEYS
+
+Do not be surprised if the C<keys %hash> returns different keys than expected,
+you should had done the Language-Tag normalization yourself before hand.
+
+=head2 DELETE
+
+=head2 matched_key
+
+After an operation that requires a lookup like FETCH or EXISTS, it is possible
+to see what language-tag actually has been selected from the Language-Range
+in the hash operation. It's ugly, but works:
+
+    
+    my $result = exists $greetings{'en; q=0.8, nl'};
+    
+    # which either returns '1' or "" (empty space) for true or false
+    
+    my language_tag = tied(%greetings)->{matched_key};
+    
+
+
+
+
+
+
+
 =cut
+
+# use HTTP::Headers::Util;
+
+our @DEFAULT_LIST;              # application wide defaults, global setting
+our %PRIORITY_LISTS;            # cache for parsed Language Tag strings
+
+sub import {
+    my $class                   = shift;
+    if (@_ > 1) {
+        carp "More arguments than expected ... assuming list of Language-Tags";
+        my $language_range = join ', ', @_;
+        $DEFAULT_LIST = _priority_list ( $language_range );
+    } else {
+        my $language_range = shift;
+        $DEFAULT_LIST = _priority_list ( $language_range );
+    };
+}
+
+sub TIEHASH {
+    my $class                   = shift;
+    my $defaults;
+    if (@_ > 1) {
+        carp "More arguments than expected ... assuming list of Language-Tags";
+        my $language_range  = join ', ', @_ ;
+        $defaults           = _priority_list ( $language_range );
+    } elsif (@_ == 1) {
+        my $language_range  = shift;
+        $defaults           = _priority_list ( $language_range );
+    } else {
+        $defaults           = $DEFAULT_LIST;
+    }
+    
+    my $hash = {
+        variants    => {},
+        defaults    => $defaults,
+        matched_key => undef,
+    };
+    
+    return bless $hash, $class
+}
+
+sub STORE {
+    my $self                    = shift;
+    my $language_tag            = shift;
+    my $value                   = shift;
+    
+    if (not defined $language_tag) {
+        carp "Using 'undef' as key is not usual...";
+        $language_tag = $self->{defaults}->[0]->{language_tag};
+        carp "... and there is no defaults to fall back" unless $language_tag;
+
+    }
+    my $subtags = _parse_language_tag($language_tag);
+    my $language_key = _language_tag_from_subtags($subtags);
+    carp "Not a language tag: '$language_tag'" unless $language_key;
+    $self->{variants}{$language_key} = { value => $value, subtags => $subtags };
+}
+
+sub FETCH {
+    my $self                    = shift;
+    my $language_range          = shift;
+    my $language_tag            = $self->EXISTS($language_range);
+    return $self->{variants}{$language_tag}; # if $language_tag;
+    
+}
 
 sub EXISTS {
     my $self                    = shift;
     my $language_range          = shift;
-    goto LANGUAGES_DEFAULTS if not defined $language_range;
-    # we have a language range (hopefully)
-    my @language_weight = _parse_language_range( $language_range );
-LANGUAGES_ARGUMENT:
-    # let's see if we can find one
-    foreach (@language_weight) {
-        exit EXISTS if not defined $_->{language_tag}; # don't do alternatives
-        # this matching schema needs to be changed a lot
-        return $_->{language_tag}
-            if exists $self->{variants}->{$_->{language_tag}};
-    }
-LANGUAGES_DEFAULTS:
-    # so, we have not find one in the arguments list, bummer
-    # but since there was no 'undef' in the list,
-    # it seems okay for a default
-    foreach (@{$self->{defaults}}) {
-        exit EXISTS if not defined $_->{language_tag}; # don't do alternatives
-        return $_->{language_tag}
-            if exists $self->{variants}->{$_->{language_tag}};
+    my $priority_list = _priority_list( $language_range );
+    
+    # check for exact matches first
+    foreach (@{$priority_list}) {
+        return $_->{language_range}
+            if exists $self->{variants}{$_->{language_range}}
     }
     
-    return;
+    my $exists = $self->_priority_list_exist ( $priority_list );
+    
+    $self->{matched_key} = $exists; # store for later if you want to know
+    return $exists if $exists;
+    
+    return; # unless $self->{defaults};
+    
 }
 
 sub FIRSTKEY {
@@ -135,45 +218,82 @@ sub NEXTKEY {
 
 sub DELETE {
     my $self                    = shift;
-    my $language;
-}
-
-sub _languageRange_normalize {
     my $language_range          = shift;
-    chomp($language_range);
-    return join ', ', map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
+    my $language_tag            = $self->EXISTS($language_range);
+    return delete $self->{variants}{$language_tag}; # if $language_tag;
 }
 
-sub _parse_language_range {
+# sub _priority_list($string)
+#
+# description:
+#   unraffles a string that should look like a priority list as used in HTTP
+#   requests. The list it returns is sorted by 'q-values' with the highest
+#   priorities first. If no 'q-value' is passed in, it will be set to 1.0.
+#   Malformed strings, containing inproper formatted language-ranges, will skipp
+#   those bits, allowing for maximum parsebillity
+#
+# arguments:
+#   - string
+#
+# returns:
+#   - arrayref of hashrefs, sorted by 'q-value'
+#       - language_range        parsed and normalized Language Range
+#       - priority              the 'q-value'
+#       - subtags               a hashref of the subtags in the language range
+#                               see sub _parse_language_tag
+#
+sub _priority_list {
     my $language_range          = shift;
     my @parts  = map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
-    my @priorities;
+    my $elements;
     foreach (@parts) {
-        if ( /\s*([-_a-zA-Z]+)\s*;\s*q\s*=\s*(\d*\.?\d*)/ ) {
-            push @priorities, {
-                language_tag    => _normalize_language_tag($1),
-                quality         => $2,
-            };
-        } else {
-            push @priorities, {
-                language_tag    => _normalize_language_tag($_),
-                quality         => 1,
-            };
+        /\s*([-_a-zA-Z]+)\s*(?:;\s*q\s*=\s*(\d*\.?\d*))?/;
+        my $subtags             = _parse_language_tag($1);
+        next unless $subtags;
+        push @{ $elements }, {
+            language_range      => _language_tag_from_subtags($subtags),
+            priority            => $2 || 1,
+            subtags             => $subtags,
+        };
+    }
+    my @priorities = sort { $b->{priority} <=> $a->{priority} } @$elements;
+    return \@priorities;
+}
+
+sub _priority_list_exist {
+    my $self                    = shift;
+    my $priority_list           = shift;
+    foreach my $priority_item ( @{ $priority_list } ) {
+        foreach my $language_tag (keys %{$self->{variants}} ) {
+            if ( _is_tag_inside_language_range( $language_tag, $priority_item->{language_range} ) ) {
+                return $language_tag
+            }
         }
     }
-    @priorities = sort { $b->{quality} <=> $a->{quality} } @priorities; # reversed
-    return @priorities;
+    return;
 }
 
-sub _normalize_language_tag {
-    return _language_tag_from_subtags(_parse_language_tag(shift));
-}
-
-# returns a hash of normalized subtags
+# sub _parse_language_tag($string)
+#
+# description:
+#   takes a Language-Tag string and unraffles it into a hash of subtags
+#   acording to RFC 4646.
+#   
+# arguments:
+#   - string
+#
+# returns:
+#   - a hashref with optional:
+#       - language
+#       - primary
+#       - extlang
+#       - script
+#       - region
+#       - variant
+#       # un-mentioned subtags in the Language-Tag will not have a key
+#
 sub _parse_language_tag {
     my $language_tag_check      = shift;
-    
-    # Simple Regex definitions
     
     my $ALPHA           = qr/[a-z]|[A-Z]/;      # ALPHA
     my $DIGIT           = qr/[0-9]/;            # DIGIT
@@ -184,10 +304,6 @@ sub _parse_language_tag {
                         # -- strict will use [-]
     
     my $alphanum        = qr/$ALPHA|$DIGIT/;   # letters and numbers
-    
-    goto RFC_4646 if $RFC_4646;
-    
-    COMPLEX_PARSER:
     
     if ($language_tag_check =~ / ^
             (                                                   # language
@@ -212,90 +328,33 @@ sub _parse_language_tag {
         });
     }
     
-    carp "not a language_tag: '$language_tag'\n";
+    carp "not a language_tag: '$language_tag_check'\n";
     return;
     
-    
-    RFC_4646:
-    # Regex for recognizing RFC 4646 well-formed tags
-    # http://www.rfc-editor.org/rfc/rfc4646.txt
-    # http://tools.ietf.org/html/draft-ietf-ltru-4646bis-21
-        
-    my $grandfathered   = qr/ $ALPHA{1,3}
-                              (?: $SEP (?: $alphanum{2,8}) ){1,2}
-                            /x;
-                        # grandfathered registration
-                        # Note: i is the only singleton
-                        # that starts a grandfathered tag
-    
-    my $privateuse      = qr/ (?: x | X )
-                              (?: $SEP (?: $alphanum{2,8}) ){1, }
-                            /x;
-    
-    my $singleton       = qr/ [a-w] | [y-z] | [A-W] | [Y-Z] | [0-9] /x;
-                        # Single letters: x/X is reserved for private use
-    
-    my $extension       = qr/ $singleton
-                              (?: $SEP (?: $alphanum{2,8}) ){1, }
-                            /x;
-    
-    my $variant         = qr/   $alphanum{5,8}
-                            | $DIGIT $alphanum{3}
-                            /x;
-    
-    my $region          = qr/ $ALPHA{2}         # ISO 3166 code
-                            | $DIGIT{3}         # UN M.49 code
-                            /x;
-    
-    my $script          = qr/$ALPHA{4}/;        # ISO 15924 code
-    
-    my $extlang         = qr/(?: $SEP $ALPHA{3}){ ,3}/x;
-                                                # reserved for future use
-    
-    my $language        = qr/ (?: $ALPHA{2,3} $extlang? )
-                                                # shortest ISO 639 code
-                            | $ALPHA{4}         # reserved for future use
-                            | $ALPHA{5,8}       # registered language subtag
-                            /x;
-    
-    my $langtag         = qr/        ($language)
-                            (?: $SEP ($script)                          )?
-                            (?: $SEP ($region)                          )?
-                            (?: $SEP ($variant   (?: $SEP $variant)*)   )?
-                            (?: $SEP ($extension (?: $SEP $extension)*) )?
-                            (?: $SEP ($privateuse)                      )?
-                            /x;
-                        # capture each seperate element
-    
-    my $Language_Tag    = qr/ ^
-                              ( $langtag       )
-                            | ( $privateuse    )
-                            | ( $grandfathered )
-                              $
-                            /x;
-                        # capture the Language Tag
-    
-# $Language_Tag = qr/($language) $SEP ($region)/x;
-    return $Language_Tag;
 };
 
-sub _language_tag_from_subtags {
-    my $subtags         = shift;
-    my $langtag = join '_', #arguably, but hash-keys are more convenient
-        map { $subtags->{$_}}
-        grep { exists $subtags->{$_} }
-            qw /primary extlang script region variant/;
-    return $langtag;
-
+# sub _normalize_language_tag($string)
+#
+# description:
+#   takes a string and check if it matches the RFC 4646 definition
+#   normalizes to common practices (although not required)
+#
+# arguments:
+#   - string
+#
+# returns:
+#   - normalized Langauge-Tag string
+#   - undef if not matched
+#
+sub _normalize_language_tag {
+    return _language_tag_from_subtags(_parse_language_tag(shift));
 }
 
 # sub _normalize_subtags(\%subtags)
 #
 # - takes a hashref to subtags
 #
-# - returns a langtag
-#
-# capitalizes the subtags to usual capitalizing
+# - returns a new hashref with proper capitalization and removed empty subtags
 # 
 sub _normalize_subtags {
     my $subtags                 = shift;
@@ -308,6 +367,42 @@ sub _normalize_subtags {
     $newtags->{variant}  = lc $subtags->{variant}           if $subtags->{variant};
     
     return $newtags;
+}
+
+# sub _language_tag_from_subtags(\%subtags)
+#
+# description:
+#   combines the subtags into a single string in the order specified by the RFCs
+#   
+# arguments:
+#   - hashref with subtags
+#
+# returns:
+#   - single string
+#
+sub _language_tag_from_subtags {
+    my $subtags         = shift;
+    my $language_tag = join '-',
+        map { $subtags->{$_}}
+        grep { exists $subtags->{$_} }
+            qw /primary extlang script region variant/;
+    return $language_tag;
+
+}
+
+# 'de-CH',      'de-ch' "Matches the same"
+# 'de',         'de-ch' "Matches is shorter tag"
+# 'de-CH-1996', 'de-ch' "Does not match a more specified"
+sub _is_tag_inside_language_range {
+    my $language_tag            = shift;
+    my $language_range          = shift;
+    
+    $language_tag   .= '-';     # watch out.... we stored it with a underscore
+    $language_range .= '-';
+    
+    my $matching = $language_range =~ /^${language_tag}/;
+#   my $matching = $language_tag =~ /^${language_range}/;
+    return $matching;
 }
 
 1;
