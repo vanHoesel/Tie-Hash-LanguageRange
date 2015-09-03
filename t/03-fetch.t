@@ -35,4 +35,8 @@ my ($val1, $val2) = @hash{'fr', 'en'};
 ok ( ($val1 eq "Bonjour Monde" and $val2 eq "Hello World"),
     "Retrieve two values at the same time");
 
+my @vals = @hash{'fr', 'en'};
+ok ( ($vals[0] eq "Bonjour Monde" and $vals[1] eq "Hello World"),
+    "Retrieve two values at the same time");
+
 done_testing;

@@ -100,9 +100,11 @@ you should had done the Language-Tag normalization yourself before hand.
 
 =head2 matched_key
 
-After an operation that requires a lookup like FETCH or EXISTS, it is possible
-to see what language-tag actually has been selected from the Language-Range
-in the hash operation. It's ugly, but works:
+Since one can pass in a Language-Range as a key for lookup operations like
+FETCH or EXISTS, it is not sure what langauge actually has been picked for that
+operation. After such an operation it is possible to see what language-tag
+actually has been selected from the Language-Range in the hash operation. It's
+ugly, but works:
 
     
     my $result = exists $greetings{'en; q=0.8, nl'};
@@ -112,12 +114,10 @@ in the hash operation. It's ugly, but works:
     my language_tag = tied(%greetings)->{matched_key};
     
 
+=head2 keys_match
 
-
-
-
-
-
+Would it be possible to pass an argument to the `keys` function, it could be
+used as a filter, showing only the 
 =cut
 
 # use HTTP::Headers::Util;
@@ -127,6 +127,7 @@ our %PRIORITY_LISTS;            # cache for parsed Language Tag strings
 
 sub import {
     my $class                   = shift;
+    
     if (@_ > 1) {
         carp "More arguments than expected ... assuming list of Language-Tags";
         my $language_range = join ', ', @_;
@@ -140,6 +141,7 @@ sub import {
 sub TIEHASH {
     my $class                   = shift;
     my $defaults;
+    
     if (@_ > 1) {
         carp "More arguments than expected ... assuming list of Language-Tags";
         my $language_range  = join ', ', @_ ;
@@ -181,14 +183,14 @@ sub FETCH {
     my $self                    = shift;
     my $language_range          = shift;
     my $language_tag            = $self->EXISTS($language_range);
-    return $self->{variants}{$language_tag}; # if $language_tag;
     
+    return $self->{variants}{$language_tag}; # if $language_tag;
 }
 
 sub EXISTS {
     my $self                    = shift;
     my $language_range          = shift;
-    my $priority_list = _priority_list( $language_range );
+    my $priority_list           = _priority_list( $language_range );
     
     # check for exact matches first
     foreach (@{$priority_list}) {
@@ -203,16 +205,19 @@ sub EXISTS {
     
     return; # unless $self->{defaults};
     
+    # TODO implement the Defaults when there is no matching key
 }
 
 sub FIRSTKEY {
     my $self                    = shift;
+    
     my $a = scalar keys %{$self->{variants}};
     each %{$self->{variants}}
 }
 
 sub NEXTKEY {
     my $self                    = shift;
+    
     return each %{ $self->{variants} }
 }
 
@@ -220,6 +225,7 @@ sub DELETE {
     my $self                    = shift;
     my $language_range          = shift;
     my $language_tag            = $self->EXISTS($language_range);
+    
     return delete $self->{variants}{$language_tag}; # if $language_tag;
 }
 
@@ -244,6 +250,7 @@ sub DELETE {
 #
 sub _priority_list {
     my $language_range          = shift;
+    
     my @parts  = map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
     my $elements;
     foreach (@parts) {
@@ -257,12 +264,14 @@ sub _priority_list {
         };
     }
     my @priorities = sort { $b->{priority} <=> $a->{priority} } @$elements;
+    
     return \@priorities;
 }
 
 sub _priority_list_exist {
     my $self                    = shift;
     my $priority_list           = shift;
+    
     foreach my $priority_item ( @{ $priority_list } ) {
         foreach my $language_tag (keys %{$self->{variants}} ) {
             if ( _is_tag_inside_language_range( $language_tag, $priority_item->{language_range} ) ) {
@@ -270,6 +279,7 @@ sub _priority_list_exist {
             }
         }
     }
+    
     return;
 }
 
@@ -295,28 +305,9 @@ sub _priority_list_exist {
 sub _parse_language_tag {
     my $language_tag_check      = shift;
     
-    my $ALPHA           = qr/[a-z]|[A-Z]/;      # ALPHA
-    my $DIGIT           = qr/[0-9]/;            # DIGIT
+    my $language_tag_parser = _language_tag_regex();
     
-    my $SEP             = qr/[-_]/;
-                        # SEPERATOR
-                        # -- lenient parsers will use [-_]
-                        # -- strict will use [-]
-    
-    my $alphanum        = qr/$ALPHA|$DIGIT/;   # letters and numbers
-    
-    if ($language_tag_check =~ / ^
-            (                                                   # language
-                ( $ALPHA{2,3})                                  #     primary language
-                (?: $SEP                                        #     extlang
-                    ( $ALPHA{3} )
-#                   ( $ALPHA{3} ( $SEP $ALPHA{3} ){,2} )
-                )?                                              # ... optinal
-            )
-            (?: $SEP ($ALPHA{4}) )?                             # script
-            (?: $SEP ($ALPHA{2} | $DIGIT{3}) )?                 # region
-            (?: $SEP ($alphanum{5,8} | $DIGIT $alphanum{3} ) )? # variant
-            $ /x
+    if ($language_tag_check =~ / $language_tag_parser /x
         ) {
         return _normalize_subtags({
             language    => $1,
@@ -333,6 +324,38 @@ sub _parse_language_tag {
     
 };
 
+# sub _language_tag_regex ();
+#
+# returns a compiled regular expression to parse a language tag
+#
+sub _language_tag_regex {
+    
+    my $ALPHA           = qr/[a-z]|[A-Z]/;      # ALPHA
+    my $DIGIT           = qr/[0-9]/;            # DIGIT
+    
+    my $SEP             = qr/[-_]/;
+                        # SEPERATOR
+                        # -- lenient parsers will use [-_]
+                        # -- strict will use [-]
+    
+    my $alphanum        = qr/$ALPHA|$DIGIT/;   # letters and numbers
+    
+    my $regex = qr / ^
+        (                                                   # language
+            ( $ALPHA{2,3})                                  #     primary language
+            (?: $SEP                                        #     extlang
+                ( $ALPHA{3} )
+#               ( $ALPHA{3} ( $SEP $ALPHA{3} ){,2} )
+            )?                                              # ... optinal
+        )
+        (?: $SEP ($ALPHA{4}) )?                             # script
+        (?: $SEP ($ALPHA{2} | $DIGIT{3}) )?                 # region
+        (?: $SEP ($alphanum{5,8} | $DIGIT $alphanum{3} ) )? # variant
+        $ /x;
+    
+    return $regex;
+}
+
 # sub _normalize_language_tag($string)
 #
 # description:
@@ -347,6 +370,8 @@ sub _parse_language_tag {
 #   - undef if not matched
 #
 sub _normalize_language_tag {
+    my $tag = shift;
+    my $subtags = _parse_language_tag($tag);
     return _language_tag_from_subtags(_parse_language_tag(shift));
 }
 
@@ -359,6 +384,7 @@ sub _normalize_language_tag {
 sub _normalize_subtags {
     my $subtags                 = shift;
     my $newtags                 = {};
+    
     $newtags->{language} = lc $subtags->{language}          if $subtags->{language};
     $newtags->{primary}  = lc $subtags->{primary}           if $subtags->{primary};
     $newtags->{extlang}  = lc $subtags->{extlang}           if $subtags->{extlang};
@@ -382,12 +408,13 @@ sub _normalize_subtags {
 #
 sub _language_tag_from_subtags {
     my $subtags         = shift;
+    
     my $language_tag = join '-',
         map { $subtags->{$_}}
         grep { exists $subtags->{$_} }
             qw /primary extlang script region variant/;
+            
     return $language_tag;
-
 }
 
 # 'de-CH',      'de-ch' "Matches the same"
@@ -402,6 +429,7 @@ sub _is_tag_inside_language_range {
     
     my $matching = $language_range =~ /^${language_tag}/;
 #   my $matching = $language_tag =~ /^${language_range}/;
+    
     return $matching;
 }
 
