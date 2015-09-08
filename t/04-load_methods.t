@@ -2,7 +2,7 @@ use Tie::Hash::LanguageRange;
 
 use Test::More;
 
-use_ok ('Tie::Hash::LanguageRange');
+use Tie::Hash::LanguageRange;
 
 subtest "Tie::Hash methods implemented" => sub {
     can_ok('Tie::Hash::LanguageRange', 'TIEHASH');

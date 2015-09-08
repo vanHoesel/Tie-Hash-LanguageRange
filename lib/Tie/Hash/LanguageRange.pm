@@ -1,3 +1,4 @@
+
 package Tie::Hash::LanguageRange;
 
 require Tie::Hash;
@@ -114,22 +115,39 @@ ugly, but works:
     my language_tag = tied(%greetings)->{matched_key};
     
 
-=head2 keys_match
+=head2 keys_matching
 
 Would it be possible to pass an argument to the `keys` function, it could be
-used as a filter, showing only the 
+used as a filter, showing only the keys that would match... but we can't.
+
+So, since we can't 'filter' keys but still want that functionallity, here is a
+method that will do the thing.
+
+This makes it possible to do it easy:
+
+    
+    foreach (tied(%greetings)->keys_matching($language_range) { ... }
+    
+
+instead of a difficult grep:
+
+    
+    foreach (grep { $_ =~ ??? } keys %greetings { ... }
+    
+
 =cut
 
 # use HTTP::Headers::Util;
 
 our @DEFAULT_LIST;              # application wide defaults, global setting
+our $DEFAULT_LIST;              # application wide defaults, global setting
 our %PRIORITY_LISTS;            # cache for parsed Language Tag strings
 
 sub import {
     my $class                   = shift;
     
     if (@_ > 1) {
-        carp "More arguments than expected ... assuming list of Language-Tags";
+#       carp "More arguments than expected ... assuming list of Language-Tags or Ranges";
         my $language_range = join ', ', @_;
         $DEFAULT_LIST = _priority_list ( $language_range );
     } else {
@@ -140,17 +158,17 @@ sub import {
 
 sub TIEHASH {
     my $class                   = shift;
-    my $defaults;
     
+    my $defaults;
     if (@_ > 1) {
-        carp "More arguments than expected ... assuming list of Language-Tags";
+#       carp "More arguments than expected ... assuming list of Language-Tags or Ranges";
         my $language_range  = join ', ', @_ ;
         $defaults           = _priority_list ( $language_range );
     } elsif (@_ == 1) {
         my $language_range  = shift;
         $defaults           = _priority_list ( $language_range );
     } else {
-        $defaults           = $DEFAULT_LIST;
+        $defaults           = $DEFAULT_LIST; # clone or a reference?
     }
     
     my $hash = {
@@ -159,7 +177,7 @@ sub TIEHASH {
         matched_key => undef,
     };
     
-    return bless $hash, $class
+    return bless $hash, $class;
 }
 
 sub STORE {
@@ -171,7 +189,6 @@ sub STORE {
         carp "Using 'undef' as key is not usual...";
         $language_tag = $self->{defaults}->[0]->{language_tag};
         carp "... and there is no defaults to fall back" unless $language_tag;
-
     }
     my $subtags = _parse_language_tag($language_tag);
     my $language_key = _language_tag_from_subtags($subtags);
@@ -198,7 +215,7 @@ sub EXISTS {
             if exists $self->{variants}{$_->{language_range}}
     }
     
-    my $exists = $self->_priority_list_exist ( $priority_list );
+    my $exists = $self->_variants_in_list ( $priority_list );
     
     $self->{matched_key} = $exists; # store for later if you want to know
     return $exists if $exists;
@@ -268,7 +285,7 @@ sub _priority_list {
     return \@priorities;
 }
 
-sub _priority_list_exist {
+sub _variants_in_list {
     my $self                    = shift;
     my $priority_list           = shift;
     
@@ -370,8 +387,6 @@ sub _language_tag_regex {
 #   - undef if not matched
 #
 sub _normalize_language_tag {
-    my $tag = shift;
-    my $subtags = _parse_language_tag($tag);
     return _language_tag_from_subtags(_parse_language_tag(shift));
 }
 
@@ -424,7 +439,7 @@ sub _is_tag_inside_language_range {
     my $language_tag            = shift;
     my $language_range          = shift;
     
-    $language_tag   .= '-';     # watch out.... we stored it with a underscore
+    $language_tag   .= '-';
     $language_range .= '-';
     
     my $matching = $language_range =~ /^${language_tag}/;
@@ -432,5 +447,14 @@ sub _is_tag_inside_language_range {
     
     return $matching;
 }
+
+=head1 COPYRIGHT AND LICENSE
+
+This software is copyright (c) 2015 by Theo J. van Hoesel - THEMA-MEDIA
+
+This is free software; you can redistribute it and/or modify it under
+the same terms as the Perl 5 programming language system itself.
+
+=cut
 
 1;
