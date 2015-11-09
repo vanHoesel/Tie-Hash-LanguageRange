@@ -266,7 +266,9 @@ sub DELETE {
 sub _priority_list {
     my $language_range          = shift;
     
-    my @parts  = map { s/^\s+|\s+$//g; $_ } split ',', $language_range;
+    $language_range =~ s/\s//g;
+    my @parts  = split ',', $language_range;
+    
     my $elements;
     foreach (@parts) {
         /\s*([-_a-zA-Z]+)\s*(?:;\s*q\s*=\s*(\d*\.?\d*))?/;
@@ -400,12 +402,13 @@ sub _normalize_subtags {
     my $subtags                 = shift;
     my $newtags                 = {};
     
-    $newtags->{language} = lc $subtags->{language}          if $subtags->{language};
-    $newtags->{primary}  = lc $subtags->{primary}           if $subtags->{primary};
-    $newtags->{extlang}  = lc $subtags->{extlang}           if $subtags->{extlang};
-    $newtags->{script}   = ucfirst lc $subtags->{script}    if $subtags->{script};
-    $newtags->{region}   = uc $subtags->{region}            if $subtags->{region};
-    $newtags->{variant}  = lc $subtags->{variant}           if $subtags->{variant};
+    $newtags->{language} = lc $subtags->{language} if $subtags->{language};
+    $newtags->{primary}  = lc $subtags->{primary}  if $subtags->{primary};
+    $newtags->{extlang}  = lc $subtags->{extlang}  if $subtags->{extlang};
+    $newtags->{script}   = ucfirst
+                           lc $subtags->{script}   if $subtags->{script};
+    $newtags->{region}   = uc $subtags->{region}   if $subtags->{region};
+    $newtags->{variant}  = lc $subtags->{variant}  if $subtags->{variant};
     
     return $newtags;
 }
