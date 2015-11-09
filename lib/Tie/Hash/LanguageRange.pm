@@ -347,6 +347,9 @@ sub _parse_language_tag {
 #
 # returns a compiled regular expression to parse a language tag
 #
+# See RFC 5646 - Tags for Identifying Languages
+# Section 2.1    The Language Tag - Syntax
+#
 sub _language_tag_regex {
     
     my $ALPHA           = qr/[a-z]|[A-Z]/;      # ALPHA
