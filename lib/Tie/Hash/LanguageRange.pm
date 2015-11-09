@@ -1,11 +1,9 @@
-
 package Tie::Hash::LanguageRange;
 
 require Tie::Hash;
 @ISA = 'Tie::Hash';
 
 use Carp;
-use DDP;
 
 =head1 NAME
 
@@ -291,9 +289,11 @@ sub _variants_in_list {
     
     foreach my $priority_item ( @{ $priority_list } ) {
         foreach my $language_tag (keys %{$self->{variants}} ) {
-            if ( _is_tag_inside_language_range( $language_tag, $priority_item->{language_range} ) ) {
-                return $language_tag
-            }
+            return $language_tag
+                if _is_tag_inside_language_range(
+                    $language_tag,
+                    $priority_item->{language_range}
+                )
         }
     }
     
@@ -443,7 +443,6 @@ sub _is_tag_inside_language_range {
     $language_range .= '-';
     
     my $matching = $language_range =~ /^${language_tag}/;
-#   my $matching = $language_tag =~ /^${language_range}/;
     
     return $matching;
 }
